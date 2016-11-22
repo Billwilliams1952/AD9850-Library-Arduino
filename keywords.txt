@@ -1,5 +1,5 @@
 ﻿#######################################
-# Syntax Coloring Map For AD9833 Library
+# Syntax Coloring Map For AD9850 Library
 #######################################
 
 #######################################
@@ -9,7 +9,7 @@
 AD9850	KEYWORD1
 
 #######################################
-# AD9833
+# AD9850
 #######################################
 Reset	KEYWORD2
 ApplySignal	KEYWORD2
@@ -18,6 +18,8 @@ SetPhase	KEYWORD2
 IncrementFrequency	KEYWORD2
 IncrementPhase	KEYWORD2
 PowerDown	KEYWORD2
+GetFreqResolution	KEYWORD2
+GetPhaseResolution	KEYWORD2
 
 #######################################
 
