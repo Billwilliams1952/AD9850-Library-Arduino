@@ -29,14 +29,18 @@
 
 #include <Arduino.h>
 
-#define 2_Pow_32		4294967295UL		// 2^32 - 1
-#define 125MHz			125000000UL
-#define BITS_PER_HZ		34.359738368		// 2_Pow_32 / 125MHz
-#define RESOLUTION_HZ	0.02910383
+#define Pow_2_32		4294967295UL		// 2^32 - 1
+#define MHZ_125			125000000UL			// Module clock rate
+#define BITS_PER_HZ		34.359738368		// Pow_2_32 / MHZ_125
+#define RESOLUTION_HZ	0.02910383			// 1 / BITS_PER_HZ
+#define	BITS_PER_DEG	0.088888889			// 32 / 360
+#define RESOLUTION_DEG	11.25				// 1 / BITS_PER_DEG
+#define POWER_DOWN		B00000100
+#define SERIAL_MODE		B00000011
 
-#define PULSE_LOW_HIGH(pin)		digitalWrite((pin),HIGH); digitalWrite((pin),LOW);
+#define PULSE_HIGH(pin)		digitalWrite((pin),HIGH); digitalWrite((pin),LOW);
 
-#define PULSE_HIGH_LOW(pin)		digitalWrite((pin),LOW); digitalWrite((pin),HIGH);
+#define PULSE_LOW(pin)		digitalWrite((pin),LOW); digitalWrite((pin),HIGH);
 
 class AD9850 {
 	public:
@@ -53,7 +57,7 @@ class AD9850 {
 
 		// Define AD9850 using Serial Clocking. But not SPI. Clock as
 		// fast as possible.
-		AD9850 ( uint8_t freqUpdate, uint8_t wordClk uint8_t reset,
+		AD9850 ( uint8_t freqUpdate, uint8_t wordClk, uint8_t reset,
 				 uint8_t powerDown, uint8_t dataPin );
 
 		// Define AD9850 using parallel clocking using non-sequential bits.
@@ -84,9 +88,11 @@ class AD9850 {
 
 		float GetFreqResolution ( void ) { return RESOLUTION_HZ; }
 
-		float GetPhaseResolution ( void ) { return 0.0; } // TODO:
+		float GetPhaseResolution ( void ) { return RESOLUTION_DEG; }
 
 	private:
+
+		void Init ( void );
 
 		void CalculateFrequencyWord ( float frequencyInHz );
 
@@ -96,12 +102,16 @@ class AD9850 {
 
 		void LoadParallel ( void );
 
-		uint32_t freqWord;
-		uint8_t	 phaseByte;
-		uint8_t	freqUpdate, workClk, reset, data7, data6, data5, data4,
+		uint32_t freqWord;	// latest frequency to load
+		uint8_t	 phaseByte;	// latest phase value to load
+		uint8_t	freqUpdate, /* On the rising edge of this clock, the
+							 * DDS updates to the frequency (or phase)
+							 * loaded in the data input register; it then
+							 * resets the pointer to Word 0. */
+				wordClock, reset, data7, data6, data5, data4,
 				data3, data2, data1, data0;
 		char	portName;
-		float 	frequency, phase;
+		float 	frequency, phase;	// latest programmed values
 		bool	powerDown = false, serialLoad, useDirectPort;
 		
 };
