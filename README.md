@@ -1,6 +1,8 @@
 # AD9850-Library-Arduino
 Arduino library to control the AD9850 DDS module
 
+**-------------CODE IS IN WORK------------**
+
 **From Analog Devices data sheet:** (http://www.analog.com/media/en/technical-documentation/data-sheets/AD9850.pdf)
 >"The AD9850 is a highly integrated device that uses advanced DDS technology coupled with an internal high speed, high performance D/A converter and comparator to form a complete, digitally programmable frequency synthesizer and clock generator function. When referenced to an accurate clock source, the AD9850 generates a spectrally pure, frequency/phase programmable, analog output sine wave. This sine wave can be used directly as a frequency source, or it can be converted to a square wave for agile-clock generator applications."
 
