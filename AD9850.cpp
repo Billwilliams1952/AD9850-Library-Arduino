@@ -27,19 +27,61 @@
 
 // Define AD9850 using serial clocking
 AD9850 :: AD9850 ( uint8_t freqUpdate, uint8_t wordClock, uint8_t reset,
-				 uint8_t powerDown, uint8_t dataPin ) {
+				 uint8_t powerDownPin, uint8_t dataPin ) {
 	this->freqUpdate = freqUpdate;
 	this->wordClock = wordClock;
 	this->reset = reset;
 	Init();
-	data0 = powerDown;			// Connected to pin D2 on AD9850
-	pinMode(data2,powerDown);
+	data2 = powerDownPin;			// Connected to pin D2 on AD9850
+	pinMode(data2,OUTPUT);
 	digitalWrite(data2,LOW);	// Not in power down
-	data7 = dataPin;			// data pion for serial transfers
-	pinMode(data7,dataPin);
+	data7 = dataPin;			// data pin for serial transfers
+	pinMode(data7,OUTPUT);
 	digitalWrite(data7,LOW);
-	phaseByte = 0x03;
+	phaseByte = 0;
 	serialLoad = true;
+	useDirectPort = false;
+
+	// Special case for POWER_DOWN: Pulse freqUpdate first, then wordClock
+	// 8 bits where POWER_DOWN is bit D2 and D0 D1 are 0 0. The rest
+	// are don't cares. 
+}
+
+/*
+ * Define AD9850 using predefined pins. Either setup using serial or
+ * parallel modes. Uses Direct Port writes for maximum speed.
+ * See AD9850.h files for pin definitions
+ */
+AD9850 :: AD9850 ( bool useSerialLoad, uint8_t reset ) {
+	this->reset = reset;
+	pinMode(reset,OUTPUT);
+	digitalWrite(reset,LOW);
+	// Use Direct port manipulations.....
+	useDirectPort = true;
+	if ( useSerialLoad ) {
+		serialLoad = true;
+		pinMode(DIRECT_DATA_PIN,OUTPUT);
+		digitalWrite(DIRECT_DATA_PIN,LOW);
+		pinMode(DIRECT_POWER_DOWN_PIN,OUTPUT);
+		digitalWrite(DIRECT_POWER_DOWN_PIN,LOW);
+	}
+	else {
+		serialLoad = false;
+		// The entire port is already defined
+		DATA_DIRECTION_PORT = B00000000; 	// All outputs;
+		DATA_PORT = B00000011;				// Setup Serial read
+	}
+	pinMode(DIRECT_FREQ_UPDATE_PIN,OUTPUT);
+	digitalWrite(DIRECT_FREQ_UPDATE_PIN,LOW);
+	pinMode(DIRECT_WORD_CLOCK_PIN,OUTPUT);
+	digitalWrite(DIRECT_WORD_CLOCK_PIN,LOW);
+
+	pinMode(reset,OUTPUT);
+	digitalWrite(reset,LOW);		// not in reset mode
+	phase = 0.0;
+	frequency = 0.0;
+	freqWord = 0x0000;
+	powerDown = false;
 }
 
 // Define AD9850 using parallel clocking using non-sequential bits.
@@ -61,25 +103,10 @@ AD9850 :: AD9850 ( uint8_t freqUpdate, uint8_t wordClock, uint8_t reset,
 	this->data5 = data5;
 	this->data6 = data6;
 	this->data7 = data7;
-	phaseByte = 0x00;
+	phaseByte = PARALLEL_MODE;
 	
 	serialLoad = false;
 	useDirectPort = false;
-}
-
-// Define AD9850 using a PORT - assumes bits in order D0 to D0,
-// D1 to D1, ..., D7 to D7. Can use PORTX command to update all
-// eight bits at once, then load them into the AD9850.
-AD9850 :: AD9850 ( uint8_t freqUpdate, uint8_t wordClock, uint8_t reset,
-		 char portName ) {
-	this->freqUpdate = freqUpdate;
-	this->wordClock = wordClock;
-	this->reset = reset;
-	Init();
-	this->portName = portName;
-	serialLoad = false;
-	useDirectPort = true;
-	phaseByte = 0x00;
 }
 
 /*
@@ -91,7 +118,7 @@ void AD9850 :: Init ( void ) {
 	pinMode(wordClock,OUTPUT);
 	digitalWrite(wordClock,LOW);
 	pinMode(reset,OUTPUT);
-	digitalWrite(reset,HIGH);		// not in reset mode
+	digitalWrite(reset,LOW);		// not in reset mode
 	phase = 0.0;
 	frequency = 0.0;
 	freqWord = 0x0000;
@@ -125,7 +152,7 @@ void AD9850 :: CalculateFrequencyWord ( float frequencyInHz ) {
 	if ( frequencyInHz > 62500000.0 ) frequencyInHz = 62500000.0;
 	else if ( frequencyInHz < 0.0 ) frequencyInHz = 0.0;
 	frequency = frequencyInHz;
-	freqWord = (uint32_t)(frequencyInHz * BITS_PER_HZ);	
+	freqWord = (uint32_t)(frequencyInHz * BITS_PER_HZ);
 }
 
 void AD9850 :: SetPhase ( float phaseInDeg ) {
@@ -146,9 +173,6 @@ void AD9850 :: CalculatePhaseByte ( float phaseInDeg ) {
 	phaseInDeg = fmod(phaseInDeg,360);
 	if ( phaseInDeg < 0 ) phaseInDeg += 360;
 	phase = phaseInDeg;
-	// TODO: Calculate phase byte
-	// Lower 3 bits are PowerDown and 2 bits for the Control. Where '11'
-	// is a Serial load and '00' is a parallel load.
 	phaseByte = ((uint8_t)(phaseInDeg * BITS_PER_DEG)) << 3;
 	// Now have phase info in bits D7 - D3
 	//Serial.print("phaseByte: "); Serial.println(phaseByte,HEX);
@@ -161,16 +185,33 @@ void AD9850 :: CalculatePhaseByte ( float phaseInDeg ) {
  * cosine 0 after additional clock cycles.
  */
 void AD9850 :: Reset ( void ) {
-	PULSE_LOW(reset);
+	digitalWrite(freqUpdate,HIGH);
+	PULSE_HIGH(reset);			// Default to parallel mode
+	digitalWrite(freqUpdate,LOW);
+	PULSE_HIGH(wordClock);		// Force into Serial mode
+	PULSE_HIGH(freqUpdate);		// Now each wordClock start serial input
+								// followed by freqUpdate when complete
 }
 
 /*
  * Enable / Disable the Powerdown function
  */
 void AD9850 :: PowerDown ( bool enable ) {
-	powerDown = enable;
-	if ( serialLoad ) LoadSerial();
-	else LoadParallel();
+	if ( serialLoad ) {
+		uint8_t val = enable ? POWER_DOWN_BIT : 0x00;
+		// Reset word counter to word 0
+		PULSE_HIGH(freqUpdate);
+		for ( uint8_t i = 0; i < 8; i++ ) {
+			digitalWrite(data7,val & 0x01);
+			PULSE_HIGH(wordClock);
+			val >>= 1;
+		}
+		// Only writing word zero. So update now
+		PULSE_HIGH(freqUpdate);
+	}
+	else {
+		
+	}
 }
 
 /*
@@ -178,30 +219,26 @@ void AD9850 :: PowerDown ( bool enable ) {
  */
 void AD9850 :: LoadSerial ( void ) {
 	// freqWord and phaseByte
-	// Load control byte with XXXXX011 (D2 D1 D0) pulse it in
-	// Now setup for continuous clocking of data on data0 which should
-	// be connected to D7 on the AD9850.
-	// There are already pullup resistors
-	digitalWrite(data2,powerDown);	// data2 connected to D2 on AD9850
-	PULSE_HIGH(wordClock);
-	PULSE_HIGH(freqUpdate);
-	// Now serial is enabled - start clocking using wordClock. Frequency
-	// first - bit0 to bit 31, then phase/control bit 0 to bit 7.
+	//PULSE_HIGH(freqUpdate);		// Make sure we're at word 0
 	uint32_t freq = freqWord;
 	for ( uint8_t i = 0; i < 32; i++ ) {
-		digitalWrite(data7,(uint8_t)freq&0x0001);
+		// digitalWrites are SLOW
+		digitalWrite(data7,(uint8_t)(freq & 0x1));
 		PULSE_HIGH(wordClock);
 		freq >>= 1;
 	}
+	
 	uint8_t phase = phaseByte;
-	if ( powerDown ) phase |= POWER_DOWN;
-	else phase &= ~POWER_DOWN;
-	phase |= SERIAL_MODE;
+	// Power down always removed if frequency is updated
+	//if ( powerDown ) phase |= POWER_DOWN_BIT;
+	//else phase &= ~POWER_DOWN_BIT;
+
 	for ( uint8_t i = 0; i < 8; i++ ) {
-		digitalWrite(data7,phase&0x0001);
+		digitalWrite(data7,phase & 0x01);
 		PULSE_HIGH(wordClock);
 		phase >>= 1;
 	}
+	PULSE_HIGH(freqUpdate);		// Should see frequency now. Reset to word 0
 }
 
 /*
@@ -218,8 +255,8 @@ void AD9850 :: LoadParallel ( void ) {
 	digitalWrite(data1,0);			// ditto
 	digitalWrite(data2,powerDown);	// data2 powerDown bit
 	uint8_t phase = phaseByte;
-	if ( powerDown ) phase |= POWER_DOWN;
-	else phase &= ~POWER_DOWN;
+	if ( powerDown ) phase |= POWER_DOWN_BIT;
+	else phase &= ~POWER_DOWN_BIT;
 	phase &= ~SERIAL_MODE;
 }
 
