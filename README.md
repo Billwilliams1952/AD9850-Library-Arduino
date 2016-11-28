@@ -10,6 +10,8 @@ Arduino library to control the AD9850 DDS module
 
 ## Synopsis
 
+![alt tag](https://cloud.githubusercontent.com/assets/3778024/20653563/021f9856-b4d5-11e6-96f8-370a5f83d253.png)
+
 ## API
 
 		// Define AD9850 using Serial mode loading.
