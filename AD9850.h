@@ -17,16 +17,19 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
+ *
+ * Normal Serial Writes:	1.06 msec for a 40 bit update
+ *
+ * Code at: https://github.com/Billwilliams1952/AD9850-Library-Arduino
  * 
  */
-
-// LOTS TODO: ----------- WORK IN PROGRESS ------------
 
 #ifndef __AD9850_H__
 
 #define __AD9850_H__
 
 #include <Arduino.h>
+#include <digitalWriteFast.h>				// Direct port manipulation
 
 #define Pow_2_32		4294967295UL		// 2^32 - 1
 #define MHZ_125			125000000UL			// Module clock rate
@@ -42,9 +45,10 @@
 #define SERIAL_MODE		B00000011			// Register info
 #define PARALLEL_MODE	B00000000			// register info
 
-#define PULSE_HIGH(pin)		digitalWrite((pin),HIGH); delayMicroseconds(15); digitalWrite((pin),LOW);
+// TODO: Use digitalWriteFast here
+#define PULSE_HIGH(pin)		digitalWrite((pin),HIGH); digitalWrite((pin),LOW);
 
-#define PULSE_LOW(pin)		digitalWrite((pin),LOW); delayMicroseconds(15); digitalWrite((pin),HIGH);
+#define PULSE_LOW(pin)		digitalWrite((pin),LOW); digitalWrite((pin),HIGH);
 
 /*
  * For maximum transfer speed, pins are predefined allowing us to

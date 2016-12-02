@@ -17,11 +17,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
+ *
+ * Normal Serial frequency Writes:	1.06 msec for a 40 bit update
+ * Normal Phase writes:				232-240 usec
  * 
+ * Code at: https://github.com/Billwilliams1952/AD9850-Library-Arduino
  * 
  */
 
- // LOTS TODO: ----------- WORK IN PROGRESS ------------
+// LOTS TODO: ----------- WORK IN PROGRESS ------------
 
 #include "AD9850.h"
 
@@ -51,6 +55,7 @@ AD9850 :: AD9850 ( uint8_t freqUpdate, uint8_t wordClock, uint8_t reset,
  * Define AD9850 using predefined pins. Either setup using serial or
  * parallel modes. Uses Direct Port writes for maximum speed.
  * See AD9850.h files for pin definitions
+ * TODO:  !!!! NOT DONE YET!!!! Need 
  */
 AD9850 :: AD9850 ( bool useSerialLoad, uint8_t reset ) {
 	this->reset = reset;
@@ -149,7 +154,8 @@ void AD9850 :: IncrementFrequency ( float frequencyInHz ) {
  * in Hertz.
  */
 void AD9850 :: CalculateFrequencyWord ( float frequencyInHz ) {
-	if ( frequencyInHz > 62500000.0 ) frequencyInHz = 62500000.0;
+	// TODO: More realistic number here!!
+	if ( frequencyInHz > 25000000.0 ) frequencyInHz = 25000000.0;
 	else if ( frequencyInHz < 0.0 ) frequencyInHz = 0.0;
 	frequency = frequencyInHz;
 	freqWord = (uint32_t)(frequencyInHz * BITS_PER_HZ);
@@ -173,9 +179,7 @@ void AD9850 :: CalculatePhaseByte ( float phaseInDeg ) {
 	phaseInDeg = fmod(phaseInDeg,360);
 	if ( phaseInDeg < 0 ) phaseInDeg += 360;
 	phase = phaseInDeg;
-	phaseByte = ((uint8_t)(phaseInDeg * BITS_PER_DEG)) << 3;
-	// Now have phase info in bits D7 - D3
-	//Serial.print("phaseByte: "); Serial.println(phaseByte,HEX);
+	phaseByte = (((uint8_t)(phaseInDeg * BITS_PER_DEG)) << 3);
 }
 
 /*
@@ -197,20 +201,10 @@ void AD9850 :: Reset ( void ) {
  * Enable / Disable the Powerdown function
  */
 void AD9850 :: PowerDown ( bool enable ) {
-	if ( serialLoad ) {
-		uint8_t val = enable ? POWER_DOWN_BIT : 0x00;
-		// Reset word counter to word 0
-		PULSE_HIGH(freqUpdate);
-		for ( uint8_t i = 0; i < 8; i++ ) {
-			digitalWrite(data7,val & 0x01);
-			PULSE_HIGH(wordClock);
-			val >>= 1;
-		}
-		// Only writing word zero. So update now
-		PULSE_HIGH(freqUpdate);
-	}
+	powerDown = enable;
+	if ( serialLoad )
+		LoadSerial();
 	else {
-		
 	}
 }
 
@@ -219,26 +213,30 @@ void AD9850 :: PowerDown ( bool enable ) {
  */
 void AD9850 :: LoadSerial ( void ) {
 	// freqWord and phaseByte
-	//PULSE_HIGH(freqUpdate);		// Make sure we're at word 0
+
 	uint32_t freq = freqWord;
 	for ( uint8_t i = 0; i < 32; i++ ) {
 		// digitalWrites are SLOW
+		// Use digitalWriteFast here
 		digitalWrite(data7,(uint8_t)(freq & 0x1));
+		// Use digitalWriteFast here
 		PULSE_HIGH(wordClock);
 		freq >>= 1;
 	}
 	
-	uint8_t phase = phaseByte;
-	// Power down always removed if frequency is updated
-	//if ( powerDown ) phase |= POWER_DOWN_BIT;
-	//else phase &= ~POWER_DOWN_BIT;
+	uint8_t phaseVal = phaseByte;
+	
+	if ( powerDown ) phaseVal |= POWER_DOWN_BIT;
+	else phaseVal &= ~POWER_DOWN_BIT;
 
 	for ( uint8_t i = 0; i < 8; i++ ) {
-		digitalWrite(data7,phase & 0x01);
+		// Use digitalWriteFast here
+		digitalWrite(data7,phaseVal & 0x01);
 		PULSE_HIGH(wordClock);
-		phase >>= 1;
+		phaseVal >>= 1;
 	}
-	PULSE_HIGH(freqUpdate);		// Should see frequency now. Reset to word 0
+	// Use digitalWriteFast here
+	PULSE_HIGH(freqUpdate);		// Should see frequency/phase now.
 }
 
 /*
