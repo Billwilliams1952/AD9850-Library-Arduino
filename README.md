@@ -18,6 +18,8 @@ Arduino library to control the AD9850 DDS module
 
 ## API
 
+The API is in work.
+
 		// Define AD9850 using Serial mode loading.
 		AD9850 ( uint8_t freqUpdate, uint8_t wordClk, uint8_t reset,
 				 uint8_t powerDownPin, uint8_t dataPin );
