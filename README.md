@@ -17,42 +17,42 @@ Arduino library to control the AD9850 DDS module
 ![alt tag](https://cloud.githubusercontent.com/assets/3778024/20653618/e1a235d8-b4d5-11e6-8dc4-dfd327e4fcbd.png)
 
 ## API
+```C++
+//The API is in work.
 
-The API is in work.
+// Define AD9850 using Serial mode loading.
+AD9850 ( uint8_t freqUpdate, uint8_t wordClk, uint8_t reset,
+	uint8_t powerDownPin, uint8_t dataPin );
 
-		// Define AD9850 using Serial mode loading.
-		AD9850 ( uint8_t freqUpdate, uint8_t wordClk, uint8_t reset,
-				 uint8_t powerDownPin, uint8_t dataPin );
+// Define AD9850 using predefined pins.
+// Uses Direct Port writes for maximum speed.
+// See AD9850.h files for pin definitions
+AD9850 ( bool useSerialLoad, uint8_t reset );
 
-		// Define AD9850 using predefined pins.
-		// Uses Direct Port writes for maximum speed.
-		// See AD9850.h files for pin definitions
-		AD9850 ( bool useSerialLoad, uint8_t reset );
+// Define AD9850 using Parallel mode loading.
+// This will require 8 separate digitalWrites for each pin.
+AD9850 ( uint8_t freqUpdate, uint8_t wordClk, uint8_t reset,
+	uint8_t data7, uint8_t data6, uint8_t data5, uint8_t data4,
+	uint8_t data3, uint8_t data2, uint8_t data1, uint8_t data0 );
 
-		// Define AD9850 using Parallel mode loading.
-		// This will require 8 separate digitalWrites for each pin.
-		AD9850 ( uint8_t freqUpdate, uint8_t wordClk, uint8_t reset,
-				 uint8_t data7, uint8_t data6, uint8_t data5, uint8_t data4,
-				 uint8_t data3, uint8_t data2, uint8_t data1, uint8_t data0 );
+void ApplySignal ( float frequencyInHz, float phaseInDeg );
 
-		void ApplySignal ( float frequencyInHz, float phaseInDeg );
+void SetFrequency ( float frequencyInHz );
 
-		void SetFrequency ( float frequencyInHz );
+void IncrementFrequency ( float frequencyInHz );
 
-		void IncrementFrequency ( float frequencyInHz );
+void SetPhase ( float phaseInDeg );
 
-		void SetPhase ( float phaseInDeg );
+void IncrementPhase ( float phaseInDeg );
 
-		void IncrementPhase ( float phaseInDeg );
+void Reset ( void );
 
-		void Reset ( void );
+void PowerDown ( bool enable );
 
-		void PowerDown ( bool enable );
+float GetFreqResolution ( void ) { return RESOLUTION_HZ; }
 
-		float GetFreqResolution ( void ) { return RESOLUTION_HZ; }
-
-		float GetPhaseResolution ( void ) { return RESOLUTION_DEG; }
-
+float GetPhaseResolution ( void ) { return RESOLUTION_DEG; }
+```
 ## License
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
